@@ -656,28 +656,29 @@ else()
   add_c_flag_if_supported(-Wformat-security C_SECURITY_FLAGS)
   add_cxx_flag_if_supported(-Wformat-security CXX_SECURITY_FLAGS)
 
-  # -fstack-protector
-  if (NOT WIN32)
-    add_c_flag_if_supported(-fstack-protector C_SECURITY_FLAGS)
-    add_cxx_flag_if_supported(-fstack-protector CXX_SECURITY_FLAGS)
-    add_c_flag_if_supported(-fstack-protector-strong C_SECURITY_FLAGS)
-    add_cxx_flag_if_supported(-fstack-protector-strong CXX_SECURITY_FLAGS)
-  endif()
+ # -fstack-protector
+ if (NOT OPENBSD AND NOT (WIN32 AND (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_LESS 9.1)))
+ add_c_flag_if_supported(-fstack-protector C_SECURITY_FLAGS)
+ add_cxx_flag_if_supported(-fstack-protector CXX_SECURITY_FLAGS)
+ add_c_flag_if_supported(-fstack-protector-strong C_SECURITY_FLAGS)
+ add_cxx_flag_if_supported(-fstack-protector-strong CXX_SECURITY_FLAGS)
+endif()
 
-  # New in GCC 8.2
-  if (NOT WIN32)
-    add_c_flag_if_supported(-fcf-protection=full C_SECURITY_FLAGS)
-    add_cxx_flag_if_supported(-fcf-protection=full CXX_SECURITY_FLAGS)
-    add_c_flag_if_supported(-fstack-clash-protection C_SECURITY_FLAGS)
-    add_cxx_flag_if_supported(-fstack-clash-protection CXX_SECURITY_FLAGS)
-  endif()
+# New in GCC 8.2
+if (NOT OPENBSD AND NOT (WIN32 AND (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_LESS 9.1)))
+ add_c_flag_if_supported(-fcf-protection=full C_SECURITY_FLAGS)
+ add_cxx_flag_if_supported(-fcf-protection=full CXX_SECURITY_FLAGS)
+endif()
+if (NOT WIN32 AND NOT OPENBSD)
+ add_c_flag_if_supported(-fstack-clash-protection C_SECURITY_FLAGS)
+ add_cxx_flag_if_supported(-fstack-clash-protection CXX_SECURITY_FLAGS)
+endif()
 
-  # Removed in GCC 9.1 (or before ?), but still accepted, so spams the output
-  if (NOT (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_C_COMPILER_VERSION VERSION_LESS 9.1))
-    add_c_flag_if_supported(-mmitigate-rop C_SECURITY_FLAGS)
-    add_cxx_flag_if_supported(-mmitigate-rop CXX_SECURITY_FLAGS)
-  endif()
-
+# Removed in GCC 9.1 (or before ?), but still accepted, so spams the output
+if (NOT (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_C_COMPILER_VERSION VERSION_LESS 9.1))
+ add_c_flag_if_supported(-mmitigate-rop C_SECURITY_FLAGS)
+ add_cxx_flag_if_supported(-mmitigate-rop CXX_SECURITY_FLAGS)
+endif()
   # linker
   if (NOT WIN32)
     # Windows binaries die on startup with PIE
