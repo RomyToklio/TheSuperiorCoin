@@ -182,8 +182,9 @@ Blockchain::Blockchain(tx_memory_pool& tx_pool) :
   m_long_term_block_weights_cache_rolling_median(CRYPTONOTE_LONG_TERM_BLOCK_WEIGHT_WINDOW_SIZE),
   m_difficulty_for_next_block_top_hash(crypto::null_hash),
   m_difficulty_for_next_block(1),
-  m_btc_valid(false)
-{
+  m_btc_valid(false),
+  m_batch_success(true)
+  {
   LOG_PRINT_L3("Blockchain::" << __func__);
 }
 //------------------------------------------------------------------
@@ -619,17 +620,13 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   CRITICAL_REGION_LOCAL(m_tx_pool);
   CRITICAL_REGION_LOCAL1(m_blockchain_lock);
 
-  while (!m_db->batch_start())
-  {
-    m_blockchain_lock.unlock();
-    m_tx_pool.unlock();
-    epee::misc_utils::sleep_no_w(1000);
-    m_tx_pool.lock();
-    m_blockchain_lock.lock();
-  }
+  bool stop_batch = m_db->batch_start();
 
   try
   {
+const uint64_t blockchain_height = m_db->height();
+    if (blockchain_height > 0)
+      nblocks = std::min(nblocks, blockchain_height - 1);
     for (i=0; i < nblocks; ++i)
     {
       pop_block_from_blockchain();
@@ -637,10 +634,14 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("Error when popping blocks, only " << i << " blocks are popped: " << e.what());
+    LOG_ERROR("Error when popping blocks after processing " << i << " blocks: " << e.what());
+    if (stop_batch)
+      m_db->batch_abort();
+    return;
   }
-
-  m_db->batch_stop();
+  
+  if (stop_batch)
+    m_db->batch_stop();
 }
 //------------------------------------------------------------------
 // This function tells BlockchainDB to remove the top block from the
@@ -1575,7 +1576,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
 
   size_t txs_weight;
   uint64_t fee;
-  if (!m_tx_pool.fill_block_template(b, median_weight, already_generated_coins, txs_weight, fee, expected_reward, b.major_version, l_timestamp))
+  if (!m_tx_pool.fill_block_template(b, median_weight, already_generated_coins, txs_weight, fee, expected_reward, b.major_version))
   {
     return false;
   }
@@ -1640,7 +1641,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
   //make blocks coin-base tx looks close to real coinbase tx to get truthful blob weight
   uint8_t hf_version = b.major_version;
   size_t max_outs = hf_version >= 4 ? 1 : 11;
-  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version, b.timestamp, l_timestamp);
+  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, first chance");
   size_t cumulative_weight = txs_weight + get_transaction_weight(b.miner_tx);
 #if defined(DEBUG_CREATE_BLOCK_TEMPLATE)
@@ -1649,7 +1650,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
 #endif
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
-    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version, b.timestamp, l_timestamp);
+    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version);
 
     CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, second chance");
     size_t coinbase_weight = get_transaction_weight(b.miner_tx);
@@ -2003,10 +2004,14 @@ bool Blockchain::handle_get_objects(NOTIFY_REQUEST_GET_OBJECTS::request& arg, NO
 
     if (missed_tx_ids.size() != 0)
     {
-      LOG_ERROR("Error retrieving blocks, missed " << missed_tx_ids.size()
-          << " transactions for block with hash: " << get_block_hash(bl.second)
-          << std::endl
-      );
+      // do not display an error if the peer asked for an unpruned block which we are not meant to have
+      if (tools::has_unpruned_block(get_block_height(bl.second), get_current_blockchain_height(), get_blockchain_pruning_seed()))
+      {
+        LOG_ERROR("Error retrieving blocks, missed " << missed_tx_ids.size()
+            << " transactions for block with hash: " << get_block_hash(bl.second)
+            << std::endl
+        );
+      }
 
       // append missed transaction hashes to response missed_ids field,
       // as done below if any standalone transactions were requested
@@ -3959,6 +3964,7 @@ leave:
     catch (const KEY_IMAGE_EXISTS& e)
     {
       LOG_ERROR("Error adding block with hash: " << id << " to blockchain, what = " << e.what());
+      m_batch_success = false;
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
       return false;
@@ -3966,7 +3972,8 @@ leave:
     catch (const std::exception& e)
     {
       //TODO: figure out the best way to deal with this failure
-      LOG_ERROR("Error adding block with hash: " << id << " to blockchain, what = " << e.what());
+      LOG_ERROR("Error adding block with hash: " << id << " to blockchain, what = " << e.what());      
+      m_batch_success = false;
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
       return false;
@@ -4276,7 +4283,10 @@ bool Blockchain::cleanup_handle_incoming_blocks(bool force_sync)
 
   try
   {
-    m_db->batch_stop();
+    if (m_batch_success)
+      m_db->batch_stop();
+    else
+      m_db->batch_abort();
     success = true;
   }
   catch (const std::exception &e)
@@ -4500,6 +4510,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
     m_tx_pool.lock();
     m_blockchain_lock.lock();
   }
+  m_batch_success = true;
 
   const uint64_t height = m_db->height();
   if ((height + blocks_entry.size()) < m_blocks_hash_check.size())

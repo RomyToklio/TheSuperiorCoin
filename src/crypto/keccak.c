@@ -105,9 +105,12 @@ void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen)
     memset(st, 0, sizeof(st));
 
     for ( ; inlen >= rsiz; inlen -= rsiz, in += rsiz) {
-        for (i = 0; i < rsizw; i++)
-            st[i] ^= swap64le(((uint64_t *) in)[i]);
-        keccakf(st, KECCAK_ROUNDS);
+      for (i = 0; i < rsizw; i++) {
+        uint64_t ina;
+        memcpy(&ina, in + i * 8, 8);
+        st[i] ^= swap64le(ina);
+      }
+      keccakf(st, KECCAK_ROUNDS);
     }
     
     // last block and padding
@@ -115,7 +118,7 @@ void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen)
     {
       local_abort("Bad keccak use");
     }
-
+if (inlen > 0)
     memcpy(temp, in, inlen);
     temp[inlen++] = 1;
     memset(temp + inlen, 0, rsiz - inlen);

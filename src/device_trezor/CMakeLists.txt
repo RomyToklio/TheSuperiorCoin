@@ -30,14 +30,14 @@ set(TREZOR_PROTOB_H
         trezor/messages/messages.pb.h
         trezor/messages/messages-common.pb.h
         trezor/messages/messages-management.pb.h
-        trezor/messages/messages-superior.pb.h
+        trezor/messages/messages-monero.pb.h
 )
 
 set(TREZOR_PROTOB_CPP
         trezor/messages/messages.pb.cc
         trezor/messages/messages-common.pb.cc
         trezor/messages/messages-management.pb.cc
-        trezor/messages/messages-superior.pb.cc
+        trezor/messages/messages-monero.pb.cc
 )
 
 set(trezor_headers

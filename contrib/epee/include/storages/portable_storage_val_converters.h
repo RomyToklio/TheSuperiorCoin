@@ -136,7 +136,7 @@ POP_WARNINGS
 
     // For MySuperior/OpenSuperior backend compatibility
     // MySuperior backend sends amount, fees and timestamp values as strings.
-    // Until MM backend is updated, this is needed for compatibility between OpenSuperior and MySuperior.
+    // Until MM backend is updated, this is needed for compatibility between OpenSuperior and MySuperior. 
     template<>
     struct convert_to_integral<std::string, uint64_t, false>
     {

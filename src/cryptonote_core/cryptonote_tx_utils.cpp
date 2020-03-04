@@ -75,7 +75,7 @@ namespace cryptonote
     LOG_PRINT_L2("destinations include " << num_stdaddresses << " standard addresses and " << num_subaddresses << " subaddresses");
   }
   //---------------------------------------------------------------
-  bool construct_miner_tx(size_t height, size_t median_weight, uint64_t already_generated_coins, size_t current_block_weight, uint64_t fee, const account_public_address &miner_address, transaction& tx, const blobdata& extra_nonce, size_t max_outs, uint8_t hard_fork_version, uint64_t ts, uint64_t l_timestamp) {
+  bool construct_miner_tx(size_t height, size_t median_weight, uint64_t already_generated_coins, size_t current_block_weight, uint64_t fee, const account_public_address &miner_address, transaction& tx, const blobdata& extra_nonce, size_t max_outs, uint8_t hard_fork_version) {
     tx.vin.clear();
     tx.vout.clear();
     tx.extra.clear();
@@ -92,8 +92,7 @@ namespace cryptonote
     in.height = height;
 
     uint64_t block_reward;
-      LOG_PRINT_L0("Block 1");
-    if(!get_block_rewardb(median_weight, current_block_weight, already_generated_coins, block_reward, hard_fork_version, ts, l_timestamp))
+    if(!get_block_reward(median_weight, current_block_weight, already_generated_coins, block_reward, hard_fork_version))
     {
       LOG_PRINT_L0("Block is too big");
       return false;
