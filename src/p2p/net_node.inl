@@ -464,7 +464,7 @@ namespace nodetool
     }
     else
     {
-       full_addrs.insert("54.39.52.140:17369"); //poolserver
+       full_addrs.insert("54.39.52.140:16035"); //poolserver
        full_addrs.insert("52.168.12.187:17369"); //blockchainexplorer
        full_addrs.insert("179.49.115.2:17369"); //HondurasDNS
        full_addrs.insert("13.91.59.2:17369"); //superminer

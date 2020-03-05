@@ -202,11 +202,11 @@ VOLUME /home/superior/.SuperiorCoin
 # superior-wallet-cli
 VOLUME /wallet
 
-EXPOSE 18080
-EXPOSE 18081
+EXPOSE 17369
+EXPOSE 16035
 
 # switch to user superior
 USER superior
 
-ENTRYPOINT ["superiord", "--p2p-bind-ip=0.0.0.0", "--p2p-bind-port=18080", "--rpc-bind-ip=0.0.0.0", "--rpc-bind-port=18081", "--non-interactive", "--confirm-external-bind"]
+ENTRYPOINT ["superiord", "--p2p-bind-ip=0.0.0.0", "--p2p-bind-port=17369", "--rpc-bind-ip=0.0.0.0", "--rpc-bind-port=18081", "--non-interactive", "--confirm-external-bind"]
 
